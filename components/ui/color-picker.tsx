@@ -3,6 +3,7 @@
 import { HexColorPicker } from 'react-colorful';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 
 interface ColorPickerProps {
@@ -25,7 +26,11 @@ export function ColorPicker({ color, onChange, label }: ColorPickerProps) {
         </PopoverTrigger>
         <PopoverContent className="w-auto p-3">
           <HexColorPicker color={color} onChange={onChange} />
-          <div className="mt-2 text-center text-xs text-gray-500">{color}</div>
+          <Input
+            value={color}
+            onChange={(e) => onChange(e.target.value)}
+            className="mt-2 h-8 text-center"
+          />
         </PopoverContent>
       </Popover>
     </div>
