@@ -1,16 +1,18 @@
 import { create } from 'zustand';
 
-export type AspectRatio = '1:1' | '16:9' | '21:9' | '4:3' | '2:1';
+export type AspectRatio = '1:1' | '16:9' | '21:9' | '4:3' | '3:4' | '2:1';
 
 export const RATIOS: { label: AspectRatio; width: number; height: number }[] = [
   { label: '1:1', width: 900, height: 900 },
   { label: '16:9', width: 1600, height: 900 },
   { label: '21:9', width: 2100, height: 900 },
   { label: '4:3', width: 1200, height: 900 },
+  { label: '3:4', width: 900, height: 1200 },
   { label: '2:1', width: 1800, height: 900 },
 ];
 
 interface TextSettings {
+  id: string;
   content: string;
   fontSize: number;
   color: string;
@@ -31,6 +33,7 @@ interface TextSettings {
 }
 
 interface IconSettings {
+  id: string;
   name: string; // identifier for the icon
   size: number;
   color: string; // useful if we allow tinting, even for colored icons
@@ -75,22 +78,35 @@ interface BackgroundSettings {
 interface CoverState {
   selectedRatios: AspectRatio[];
   showRuler: boolean;
-  text: TextSettings;
-  icon: IconSettings;
+  texts: TextSettings[];
+  icons: IconSettings[];
   background: BackgroundSettings;
+  selectedElementId: string | null;
+  selectedElementType: 'text' | 'icon' | null;
 
   // Actions
   toggleRatio: (ratio: AspectRatio) => void;
   setShowRuler: (show: boolean) => void;
-  updateText: (settings: Partial<TextSettings>) => void;
-  updateIcon: (settings: Partial<IconSettings>) => void;
+
+  addText: () => void;
+  removeText: (id: string) => void;
+  updateText: (id: string, settings: Partial<TextSettings>) => void;
+  duplicateText: (id: string) => void;
+
+  addIcon: () => void;
+  removeIcon: (id: string) => void;
+  updateIcon: (id: string, settings: Partial<IconSettings>) => void;
+  duplicateIcon: (id: string) => void;
+
+  selectElement: (id: string | null, type: 'text' | 'icon' | null) => void;
   updateBackground: (settings: Partial<BackgroundSettings>) => void;
 }
 
 export const useCoverStore = create<CoverState>((set) => ({
   selectedRatios: ['16:9'],
   showRuler: true,
-  text: {
+  texts: [{
+    id: 'text-1',
     content: '封面标题',
     fontSize: 160,
     color: '#000000',
@@ -106,8 +122,9 @@ export const useCoverStore = create<CoverState>((set) => ({
     leftOffsetY: 0,
     rightOffsetX: 0,
     rightOffsetY: 0,
-  },
-  icon: {
+  }],
+  icons: [{
+    id: 'icon-1',
     name: 'logos:react',
     size: 120,
     color: '#000000',
@@ -115,7 +132,7 @@ export const useCoverStore = create<CoverState>((set) => ({
     x: 0,
     y: 0,
     rotation: 0,
-    bgShape: 'rounded-square', // Default to a nice card look
+    bgShape: 'rounded-square',
     bgColor: '#ffffff',
     padding: 40,
     radius: 40,
@@ -124,8 +141,9 @@ export const useCoverStore = create<CoverState>((set) => ({
     shadowOffsetY: 4,
     bgOpacity: 1,
     bgBlur: 0,
+    customIconUrl: '',
     customIconRadius: 0,
-  },
+  }],
   background: {
     type: 'solid',
     color: '#f3f4f6',
@@ -142,11 +160,13 @@ export const useCoverStore = create<CoverState>((set) => ({
     positionY: 50,
     rotation: 0,
   },
+  selectedElementId: null,
+  selectedElementType: null,
 
   toggleRatio: (ratio) =>
     set((state) => {
       const exists = state.selectedRatios.includes(ratio);
-      if (exists && state.selectedRatios.length === 1) return state; // Prevent empty
+      if (exists && state.selectedRatios.length === 1) return state;
       return {
         selectedRatios: exists
           ? state.selectedRatios.filter((r) => r !== ratio)
@@ -154,10 +174,129 @@ export const useCoverStore = create<CoverState>((set) => ({
       };
     }),
   setShowRuler: (show) => set({ showRuler: show }),
-  updateText: (settings) =>
-    set((state) => ({ text: { ...state.text, ...settings } })),
-  updateIcon: (settings) =>
-    set((state) => ({ icon: { ...state.icon, ...settings } })),
+
+  addText: () => set((state) => {
+    const newId = `text-${Date.now()}`;
+    return {
+      texts: [...state.texts, {
+        id: newId,
+        content: '新文字',
+        fontSize: 160,
+        color: '#000000',
+        strokeColor: '#ffffff',
+        strokeWidth: 0,
+        fontWeight: 700,
+        x: 0,
+        y: 0,
+        rotation: 0,
+        font: 'Inter, sans-serif',
+        isSplit: false,
+        leftOffsetX: 0,
+        leftOffsetY: 0,
+        rightOffsetX: 0,
+        rightOffsetY: 0,
+      }],
+      selectedElementId: newId,
+      selectedElementType: 'text',
+    };
+  }),
+
+  removeText: (id) => set((state) => {
+    const newTexts = state.texts.filter(t => t.id !== id);
+    return {
+      texts: newTexts,
+      selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
+      selectedElementType: state.selectedElementId === id ? null : state.selectedElementType,
+    };
+  }),
+
+  updateText: (id, settings) => set((state) => ({
+    texts: state.texts.map(text =>
+      text.id === id ? { ...text, ...settings } : text
+    ),
+  })),
+
+  duplicateText: (id) => set((state) => {
+    const text = state.texts.find(t => t.id === id);
+    if (!text) return state;
+    const newId = `text-${Date.now()}`;
+    return {
+      texts: [...state.texts, {
+        ...text,
+        id: newId,
+        x: text.x + 20,
+        y: text.y + 20,
+      }],
+      selectedElementId: newId,
+      selectedElementType: 'text',
+    };
+  }),
+
+  addIcon: () => set((state) => {
+    const newId = `icon-${Date.now()}`;
+    return {
+      icons: [...state.icons, {
+        id: newId,
+        name: 'logos:react',
+        size: 120,
+        color: '#000000',
+        shadow: true,
+        x: 0,
+        y: 0,
+        rotation: 0,
+        bgShape: 'rounded-square',
+        bgColor: '#ffffff',
+        padding: 40,
+        radius: 40,
+        shadowColor: 'rgba(0,0,0,0.3)',
+        shadowBlur: 6,
+        shadowOffsetY: 4,
+        bgOpacity: 1,
+        bgBlur: 0,
+        customIconUrl: '',
+        customIconRadius: 0,
+      }],
+      selectedElementId: newId,
+      selectedElementType: 'icon',
+    };
+  }),
+
+  removeIcon: (id) => set((state) => {
+    const newIcons = state.icons.filter(i => i.id !== id);
+    return {
+      icons: newIcons,
+      selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
+      selectedElementType: state.selectedElementId === id ? null : state.selectedElementType,
+    };
+  }),
+
+  updateIcon: (id, settings) => set((state) => ({
+    icons: state.icons.map(icon =>
+      icon.id === id ? { ...icon, ...settings } : icon
+    ),
+  })),
+
+  duplicateIcon: (id) => set((state) => {
+    const icon = state.icons.find(i => i.id === id);
+    if (!icon) return state;
+    const newId = `icon-${Date.now()}`;
+    return {
+      icons: [...state.icons, {
+        ...icon,
+        id: newId,
+        x: icon.x + 20,
+        y: icon.y + 20,
+      }],
+      selectedElementId: newId,
+      selectedElementType: 'icon',
+    };
+  }),
+
+  selectElement: (id, type) => set({
+    selectedElementId: id,
+    selectedElementType: type,
+  }),
+
   updateBackground: (settings) =>
     set((state) => ({ background: { ...state.background, ...settings } })),
 }));
