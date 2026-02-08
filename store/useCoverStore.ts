@@ -22,6 +22,7 @@ interface TextSettings {
   x: number;
   y: number;
   rotation: number;
+  zIndex: number;
   // Font settings
   font: string;
   // Split settings
@@ -41,6 +42,7 @@ interface IconSettings {
   x: number;
   y: number;
   rotation: number;
+  zIndex: number;
   // New settings for "Card/Box" style icon
   bgShape: 'none' | 'circle' | 'square' | 'rounded-square';
   bgColor: string;
@@ -75,14 +77,25 @@ interface BackgroundSettings {
   rotation: number;
 }
 
+export interface AIImageSettings {
+  id: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+  rotation: number;
+  scale: number;
+  zIndex: number;
+}
+
 interface CoverState {
   selectedRatios: AspectRatio[];
   showRuler: boolean;
   texts: TextSettings[];
   icons: IconSettings[];
+  aiImages: AIImageSettings[];
   background: BackgroundSettings;
   selectedElementId: string | null;
-  selectedElementType: 'text' | 'icon' | null;
+  selectedElementType: 'text' | 'icon' | 'aiImage' | null;
 
   // Actions
   toggleRatio: (ratio: AspectRatio) => void;
@@ -98,7 +111,11 @@ interface CoverState {
   updateIcon: (id: string, settings: Partial<IconSettings>) => void;
   duplicateIcon: (id: string) => void;
 
-  selectElement: (id: string | null, type: 'text' | 'icon' | null) => void;
+  addAIImage: (imageUrl: string) => void;
+  removeAIImage: (id: string) => void;
+  updateAIImage: (id: string, settings: Partial<AIImageSettings>) => void;
+
+  selectElement: (id: string | null, type: 'text' | 'icon' | 'aiImage' | null) => void;
   updateBackground: (settings: Partial<BackgroundSettings>) => void;
 }
 
@@ -116,6 +133,7 @@ export const useCoverStore = create<CoverState>((set) => ({
     x: 0,
     y: 0,
     rotation: 0,
+    zIndex: 1,
     font: 'Inter, sans-serif',
     isSplit: false,
     leftOffsetX: 0,
@@ -132,6 +150,7 @@ export const useCoverStore = create<CoverState>((set) => ({
     x: 0,
     y: 0,
     rotation: 0,
+    zIndex: 1,
     bgShape: 'rounded-square',
     bgColor: '#ffffff',
     padding: 40,
@@ -144,6 +163,7 @@ export const useCoverStore = create<CoverState>((set) => ({
     customIconUrl: '',
     customIconRadius: 0,
   }],
+  aiImages: [],
   background: {
     type: 'solid',
     color: '#f3f4f6',
@@ -189,6 +209,7 @@ export const useCoverStore = create<CoverState>((set) => ({
         x: 0,
         y: 0,
         rotation: 0,
+        zIndex: 1,
         font: 'Inter, sans-serif',
         isSplit: false,
         leftOffsetX: 0,
@@ -244,6 +265,7 @@ export const useCoverStore = create<CoverState>((set) => ({
         x: 0,
         y: 0,
         rotation: 0,
+        zIndex: 1,
         bgShape: 'rounded-square',
         bgColor: '#ffffff',
         padding: 40,
@@ -291,6 +313,35 @@ export const useCoverStore = create<CoverState>((set) => ({
       selectedElementType: 'icon',
     };
   }),
+
+  addAIImage: (imageUrl) => set((state) => {
+    const newId = `aiImage-${Date.now()}`;
+    return {
+      aiImages: [...state.aiImages, {
+        id: newId,
+        imageUrl,
+        x: 0,
+        y: 0,
+        rotation: 0,
+        scale: 1,
+        zIndex: 1,
+      }],
+      selectedElementId: newId,
+      selectedElementType: 'aiImage',
+    };
+  }),
+
+  removeAIImage: (id) => set((state) => ({
+    aiImages: state.aiImages.filter(i => i.id !== id),
+    selectedElementId: state.selectedElementId === id ? null : state.selectedElementId,
+    selectedElementType: state.selectedElementId === id ? null : state.selectedElementType,
+  })),
+
+  updateAIImage: (id, settings) => set((state) => ({
+    aiImages: state.aiImages.map(img =>
+      img.id === id ? { ...img, ...settings } : img
+    ),
+  })),
 
   selectElement: (id, type) => set({
     selectedElementId: id,

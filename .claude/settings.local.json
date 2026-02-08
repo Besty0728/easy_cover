@@ -11,7 +11,8 @@
       "Bash(curl:*)",
       "Bash(set:*)",
       "mcp__context7__resolve-library-id",
-      "mcp__context7__query-docs"
+      "mcp__context7__query-docs",
+      "Bash(npm install:*)"
     ]
   }
 }

@@ -1,20 +1,20 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Settings, Sparkles, Upload, Loader2, X, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Settings, Sparkles, Upload, Loader2, X, Check, Plus, Globe, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useAIStore } from '@/store/useAIStore';
 import { useCoverStore } from '@/store/useCoverStore';
-import { geminiGenerateImage, geminiEditImage } from '@/lib/ai-service';
+import { geminiGenerateImage, geminiEditImage, openaiGenerateImage, openaiEditImage } from '@/lib/ai-service';
 
-const GEMINI_MODELS = [
-  { value: 'gemini-2.0-flash-exp-image-generation', label: 'Gemini 2.0 Flash (实验)' },
-  { value: 'gemini-2.5-flash-preview-native-audio-dialog', label: 'Gemini 2.5 Flash Preview' },
-];
+const ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
+const OPENAI_ASPECT_RATIOS = ['1:1', '16:9', '9:16'];
+const IMAGE_SIZES = ['1K', '2K', '4K'];
 
 export default function AIPanel() {
   const [isOpen, setIsOpen] = useState(false);
@@ -24,8 +24,16 @@ export default function AIPanel() {
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { config, updateConfig, isGenerating, generatedImages, error, setGenerating, addGeneratedImage, setError, clearImages } = useAIStore();
-  const { updateBackground } = useCoverStore();
+  const { config, updateConfig, isGenerating, generatedImages, error, setGenerating, addGeneratedImage, removeGeneratedImage, setError, clearImages } = useAIStore();
+  const { updateBackground, addAIImage } = useCoverStore();
+
+  // 获取当前 provider 的配置
+  const currentProvider = config[config.provider];
+
+  // 更新当前 provider 的配置
+  const updateProviderConfig = (updates: Partial<typeof currentProvider>) => {
+    updateConfig({ [config.provider]: { ...currentProvider, ...updates } });
+  };
 
   // 处理图片上传
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,8 +46,8 @@ export default function AIPanel() {
 
   // 生成图片
   const handleGenerate = async () => {
-    if (!prompt.trim() || !config.apiKey) {
-      setError(config.apiKey ? '请输入提示词' : '请先配置 API Key');
+    if (!prompt.trim() || !currentProvider.apiKey) {
+      setError(currentProvider.apiKey ? '请输入提示词' : '请先配置 API Key');
       return;
     }
     if (mode === 'edit' && !sourceImage) {
@@ -51,9 +59,22 @@ export default function AIPanel() {
     setGenerating(true);
 
     try {
-      const images = mode === 'generate'
-        ? await geminiGenerateImage(config.endpoint, config.apiKey, config.model, prompt)
-        : await geminiEditImage(config.endpoint, config.apiKey, config.model, sourceImage!, prompt);
+      const options = {
+        aspectRatio: config.aspectRatio,
+        imageSize: config.imageSize,
+        useGoogleSearch: config.useGoogleSearch,
+      };
+
+      let images: string[];
+      if (config.provider === 'openai') {
+        images = mode === 'generate'
+          ? await openaiGenerateImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, prompt, options)
+          : await openaiEditImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, sourceImage!, prompt, options);
+      } else {
+        images = mode === 'generate'
+          ? await geminiGenerateImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, prompt, options)
+          : await geminiEditImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, sourceImage!, prompt, options);
+      }
 
       images.forEach(addGeneratedImage);
     } catch (err) {
@@ -66,6 +87,12 @@ export default function AIPanel() {
   // 应用图片到背景
   const applyToBackground = (imageUrl: string) => {
     updateBackground({ type: 'image', imageUrl });
+  };
+
+  // 使用生成结果作为图生图源
+  const setAsSource = (imageUrl: string) => {
+    setSourceImage(imageUrl);
+    setMode('edit');
   };
 
   if (!isOpen) {
@@ -104,31 +131,34 @@ export default function AIPanel() {
           <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
             <Label className="text-xs font-medium">API 配置</Label>
             <div className="space-y-2">
+              <Select value={config.provider} onValueChange={(v: 'gemini' | 'openai') => updateConfig({ provider: v })}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gemini">Gemini</SelectItem>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
                 placeholder="API 端点"
-                value={config.endpoint}
-                onChange={(e) => updateConfig({ endpoint: e.target.value })}
+                value={currentProvider.endpoint}
+                onChange={(e) => updateProviderConfig({ endpoint: e.target.value })}
                 className="h-8 text-xs"
               />
               <Input
                 type="password"
                 placeholder="API Key"
-                value={config.apiKey}
-                onChange={(e) => updateConfig({ apiKey: e.target.value })}
+                value={currentProvider.apiKey}
+                onChange={(e) => updateProviderConfig({ apiKey: e.target.value })}
                 className="h-8 text-xs"
               />
-              <Select value={config.model} onValueChange={(v) => updateConfig({ model: v })}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GEMINI_MODELS.map((m) => (
-                    <SelectItem key={m.value} value={m.value} className="text-xs">
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                placeholder="模型名称"
+                value={currentProvider.model}
+                onChange={(e) => updateProviderConfig({ model: e.target.value })}
+                className="h-8 text-xs"
+              />
             </div>
           </div>
         )}
@@ -151,6 +181,52 @@ export default function AIPanel() {
           >
             图生图
           </Button>
+        </div>
+
+        {/* 生成配置 */}
+        <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">比例</Label>
+              <Select value={config.aspectRatio} onValueChange={(v) => updateConfig({ aspectRatio: v })}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(config.provider === 'openai' ? OPENAI_ASPECT_RATIOS : ASPECT_RATIOS).map((r) => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {config.provider === 'gemini' && (
+              <div className="space-y-1">
+                <Label className="text-xs">分辨率</Label>
+                <Select value={config.imageSize} onValueChange={(v) => updateConfig({ imageSize: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IMAGE_SIZES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          {mode === 'generate' && config.provider === 'gemini' && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="w-3 h-3" />
+                <Label className="text-xs">联网搜索</Label>
+              </div>
+              <Switch
+                checked={config.useGoogleSearch}
+                onCheckedChange={(v) => updateConfig({ useGoogleSearch: v })}
+              />
+            </div>
+          )}
         </div>
 
         {/* 图生图：上传源图 */}
@@ -241,11 +317,41 @@ export default function AIPanel() {
                   <img src={img} alt={`生成 ${i + 1}`} className="w-full rounded-lg border" />
                   <Button
                     size="icon"
-                    className="absolute bottom-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => applyToBackground(img)}
+                    variant="destructive"
+                    className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="删除"
+                    onClick={() => removeGeneratedImage(i)}
                   >
-                    <Check className="w-3 h-3" />
+                    <X className="w-3 h-3" />
                   </Button>
+                  <div className="absolute bottom-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-6 w-6"
+                      title="用于图生图"
+                      onClick={() => setAsSource(img)}
+                    >
+                      <ImageIcon className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-6 w-6"
+                      title="添加到画布"
+                      onClick={() => addAIImage(img)}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      className="h-6 w-6"
+                      title="设为背景"
+                      onClick={() => applyToBackground(img)}
+                    >
+                      <Check className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

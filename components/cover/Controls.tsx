@@ -14,7 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { IconPicker } from '@/components/cover/IconPicker';
 import { Separator } from '@/components/ui/separator';
-import { Download, RotateCcw, Maximize, Github, ExternalLink, Settings2, Link as LinkIcon, Link2, Upload, Plus, Copy, Trash } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Download, RotateCcw, Maximize, Github, ExternalLink, Settings2, Link as LinkIcon, Link2, Upload, Plus, Copy, Trash, ChevronDown, ChevronRight, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { Icon } from '@iconify/react';
 import { cn } from '@/lib/utils';
@@ -134,6 +135,18 @@ const SliderWithInput = ({
 
 export default function Controls() {
   const store = useCoverStore();
+  const [isOpen, setIsOpen] = React.useState(true);
+  const [openSections, setOpenSections] = React.useState({
+    layout: true,
+    text: true,
+    icon: true,
+    aiImage: true,
+    background: true,
+  });
+
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const selectedText = store.texts.find(t =>
     t.id === store.selectedElementId && store.selectedElementType === 'text'
@@ -141,6 +154,10 @@ export default function Controls() {
 
   const selectedIcon = store.icons.find(i =>
     i.id === store.selectedElementId && store.selectedElementType === 'icon'
+  );
+
+  const selectedAIImage = store.aiImages.find(i =>
+    i.id === store.selectedElementId && store.selectedElementType === 'aiImage'
   );
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,55 +305,84 @@ export default function Controls() {
       store.updateText(selectedText.id, updates);
   };
 
+  // 面板收起状态
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-50 bg-primary text-primary-foreground px-2 py-4 rounded-r-lg shadow-lg hover:bg-primary/90 transition-colors"
+      >
+        <PanelLeft className="w-4 h-4 mb-2" />
+        <span className="writing-mode-vertical text-xs">控制面板</span>
+      </button>
+    );
+  }
+
   return (
     <div className="w-full md:w-[360px] h-1/2 md:h-full border-t md:border-t-0 md:border-r border-border bg-background flex flex-col z-10">
+      {/* 头部 */}
+      <div className="p-3 border-b border-border flex items-center justify-between shrink-0">
+        <span className="font-medium text-sm">控制面板</span>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsOpen(false)}>
+          <PanelLeftClose className="w-4 h-4" />
+        </Button>
+      </div>
+
       <div className="flex-1 min-h-0 w-full">
         <ScrollArea className="h-full">
-            <div className="p-4 space-y-5">
+            <div className="p-4 space-y-3">
 
           {/* Layout Section */}
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <Settings2 className="w-4 h-4" />
-              布局设置
-            </h3>
-
-            <div className="space-y-2">
-              <Label className="text-sm">图片比例</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {RATIOS.map((r) => (
-                  <div key={r.label} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`ratio-${r.label}`}
-                      checked={store.selectedRatios.includes(r.label)}
-                      onCheckedChange={() => store.toggleRatio(r.label)}
-                    />
-                    <label htmlFor={`ratio-${r.label}`} className="text-sm font-medium leading-none cursor-pointer">
-                      {r.label}
-                    </label>
-                  </div>
-                ))}
+          <Collapsible open={openSections.layout} onOpenChange={() => toggleSection('layout')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <Settings2 className="w-4 h-4" />
+                布局设置
+              </h3>
+              {openSections.layout ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
+              <div className="space-y-2">
+                <Label className="text-sm">图片比例</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {RATIOS.map((r) => (
+                    <div key={r.label} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`ratio-${r.label}`}
+                        checked={store.selectedRatios.includes(r.label)}
+                        onCheckedChange={() => store.toggleRatio(r.label)}
+                      />
+                      <label htmlFor={`ratio-${r.label}`} className="text-sm font-medium leading-none cursor-pointer">
+                        {r.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <Label htmlFor="show-ruler" className="text-sm">显示标尺 / 网格</Label>
-              <Switch
-                id="show-ruler"
-                checked={store.showRuler}
-                onCheckedChange={store.setShowRuler}
-              />
-            </div>
-          </section>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="show-ruler" className="text-sm">显示标尺 / 网格</Label>
+                <Switch
+                  id="show-ruler"
+                  checked={store.showRuler}
+                  onCheckedChange={store.setShowRuler}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <Separator />
 
           {/* Text Section */}
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <span className="w-4 h-4 flex items-center justify-center font-bold">T</span>
-              文字设置
-            </h3>
+          <Collapsible open={openSections.text} onOpenChange={() => toggleSection('text')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <span className="w-4 h-4 flex items-center justify-center font-bold">T</span>
+                文字设置
+              </h3>
+              {openSections.text ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
 
             {/* 文字列表 */}
             <div className="space-y-2">
@@ -358,7 +404,10 @@ export default function Controls() {
                         ? "border-primary bg-primary/5 shadow-sm"
                         : "border-border hover:border-primary/50 hover:bg-muted/50"
                     )}
-                    onClick={() => store.selectElement(text.id, 'text')}
+                    onClick={() => store.selectElement(
+                      store.selectedElementId === text.id ? null : text.id,
+                      store.selectedElementId === text.id ? null : 'text'
+                    )}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm truncate flex-1 font-medium">{text.content || '空文字'}</span>
@@ -596,18 +645,37 @@ export default function Controls() {
                  onValueChange={(v) => store.updateText(selectedText.id, { rotation: v[0] })}
                />
             </div>
+
+            <div className="space-y-2">
+               <div className="flex justify-between items-center">
+                   <Label>层级 ({selectedText.zIndex})</Label>
+                   <ResetButton onClick={() => store.updateText(selectedText.id, { zIndex: 1 })} />
+               </div>
+               <Slider
+                 value={[selectedText.zIndex]}
+                 min={1}
+                 max={100}
+                 step={1}
+                 onValueChange={(v) => store.updateText(selectedText.id, { zIndex: v[0] })}
+               />
+            </div>
             </>
             )}
-          </section>
+            </CollapsibleContent>
+          </Collapsible>
 
           <Separator />
 
           {/* Icon Section */}
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <span className="w-4 h-4 flex items-center justify-center">⬡</span>
-              图标设置
-            </h3>
+          <Collapsible open={openSections.icon} onOpenChange={() => toggleSection('icon')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <span className="w-4 h-4 flex items-center justify-center">⬡</span>
+                图标设置
+              </h3>
+              {openSections.icon ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
 
             {/* 图标列表 */}
             <div className="space-y-2">
@@ -629,7 +697,10 @@ export default function Controls() {
                         ? "border-primary bg-primary/5 shadow-sm"
                         : "border-border hover:border-primary/50 hover:bg-muted/50"
                     )}
-                    onClick={() => store.selectElement(icon.id, 'icon')}
+                    onClick={() => store.selectElement(
+                      store.selectedElementId === icon.id ? null : icon.id,
+                      store.selectedElementId === icon.id ? null : 'icon'
+                    )}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -798,6 +869,20 @@ export default function Controls() {
                />
             </div>
 
+            <div className="space-y-2">
+               <div className="flex justify-between items-center">
+                   <Label>层级 ({selectedIcon.zIndex})</Label>
+                   <ResetButton onClick={() => store.updateIcon(selectedIcon.id, { zIndex: 1 })} />
+               </div>
+               <Slider
+                 value={[selectedIcon.zIndex]}
+                 min={1}
+                 max={100}
+                 step={1}
+                 onValueChange={(v) => store.updateIcon(selectedIcon.id, { zIndex: v[0] })}
+               />
+            </div>
+
             <div className="flex items-center justify-between">
                <Label>图标着色</Label>
                <ColorPicker color={selectedIcon.color} onChange={(c) => store.updateIcon(selectedIcon.id, { color: c })} />
@@ -932,16 +1017,123 @@ export default function Controls() {
             )}
             </>
             )}
-          </section>
+            </CollapsibleContent>
+          </Collapsible>
 
           <Separator />
 
+          {/* AI Image Section */}
+          {store.aiImages.length > 0 && (
+            <>
+            <Collapsible open={openSections.aiImage} onOpenChange={() => toggleSection('aiImage')}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full py-1">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-4 h-4 flex items-center justify-center">🎨</span>
+                  AI 图片
+                </h3>
+                {openSections.aiImage ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 pt-3">
+
+              <div className="space-y-1.5">
+                {store.aiImages.map((img, index) => (
+                  <div
+                    key={img.id}
+                    className={cn(
+                      "px-3 py-2.5 border rounded-md cursor-pointer transition-all",
+                      store.selectedElementId === img.id && store.selectedElementType === 'aiImage'
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border hover:border-primary/50 hover:bg-muted/50"
+                    )}
+                    onClick={() => store.selectElement(
+                      store.selectedElementId === img.id ? null : img.id,
+                      store.selectedElementId === img.id ? null : 'aiImage'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <img src={img.imageUrl} alt="AI" className="w-8 h-8 object-cover rounded" />
+                        <span className="text-sm font-medium">AI 图片 {index + 1}</span>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          store.removeAIImage(img.id);
+                        }}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedAIImage && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label>缩放 ({selectedAIImage.scale.toFixed(2)}x)</Label>
+                      <ResetButton onClick={() => store.updateAIImage(selectedAIImage.id, { scale: 1 })} />
+                    </div>
+                    <Slider
+                      value={[selectedAIImage.scale]}
+                      min={0.1}
+                      max={3}
+                      step={0.01}
+                      onValueChange={(v) => store.updateAIImage(selectedAIImage.id, { scale: v[0] })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label>旋转 ({selectedAIImage.rotation}°)</Label>
+                      <ResetButton onClick={() => store.updateAIImage(selectedAIImage.id, { rotation: 0 })} />
+                    </div>
+                    <Slider
+                      value={[selectedAIImage.rotation]}
+                      min={0}
+                      max={360}
+                      step={1}
+                      onValueChange={(v) => store.updateAIImage(selectedAIImage.id, { rotation: v[0] })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label>层级 ({selectedAIImage.zIndex})</Label>
+                      <ResetButton onClick={() => store.updateAIImage(selectedAIImage.id, { zIndex: 1 })} />
+                    </div>
+                    <Slider
+                      value={[selectedAIImage.zIndex]}
+                      min={1}
+                      max={100}
+                      step={1}
+                      onValueChange={(v) => store.updateAIImage(selectedAIImage.id, { zIndex: v[0] })}
+                    />
+                  </div>
+                </>
+              )}
+              </CollapsibleContent>
+            </Collapsible>
+
+            <Separator />
+            </>
+          )}
+
           {/* Background Section */}
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <span className="w-4 h-4 flex items-center justify-center">◧</span>
-              背景设置
-            </h3>
+          <Collapsible open={openSections.background} onOpenChange={() => toggleSection('background')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-1">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <span className="w-4 h-4 flex items-center justify-center">◧</span>
+                背景设置
+              </h3>
+              {openSections.background ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
 
             <Tabs defaultValue={store.background.type} onValueChange={(v) => store.updateBackground({ type: v as 'solid' | 'image' })}>
                 <TabsList className="grid w-full grid-cols-2 h-9">
@@ -1100,7 +1292,8 @@ export default function Controls() {
                     </div>
                 </div>
             )}
-          </section>
+            </CollapsibleContent>
+          </Collapsible>
 
         </div>
       </ScrollArea>

@@ -11,19 +11,21 @@ export default function Canvas() {
     showRuler,
     texts,
     icons,
+    aiImages,
     background,
     selectedElementId,
     selectedElementType,
     selectElement,
     updateText,
     updateIcon,
+    updateAIImage,
   } = useCoverStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [dragging, setDragging] = useState<{
     id: string;
-    type: 'text' | 'icon';
+    type: 'text' | 'icon' | 'aiImage';
     startX: number;
     startY: number;
     elementX: number;
@@ -66,7 +68,7 @@ export default function Canvas() {
   const handleMouseDown = (
     e: React.MouseEvent,
     id: string,
-    type: 'text' | 'icon',
+    type: 'text' | 'icon' | 'aiImage',
     currentX: number,
     currentY: number
   ) => {
@@ -94,8 +96,10 @@ export default function Canvas() {
 
       if (dragging.type === 'text') {
         updateText(dragging.id, { x: newX, y: newY });
-      } else {
+      } else if (dragging.type === 'icon') {
         updateIcon(dragging.id, { x: newX, y: newY });
+      } else if (dragging.type === 'aiImage') {
+        updateAIImage(dragging.id, { x: newX, y: newY });
       }
     };
 
@@ -110,7 +114,7 @@ export default function Canvas() {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, scale, updateText, updateIcon]);
+  }, [dragging, scale, updateText, updateIcon, updateAIImage]);
 
   // Helper to convert hex to rgba
   const hexToRgba = (hex: string, alpha: number) => {
@@ -208,13 +212,14 @@ export default function Canvas() {
           return (
             <div
               key={text.id}
-              className="absolute z-10 cursor-move select-none"
+              className="absolute cursor-move select-none"
               style={{
                 left: '50%',
                 top: '50%',
                 transform: `translate(-50%, -50%) translate(${text.x}px, ${text.y}px)`,
                 outline: isSelected ? '2px dashed #3b82f6' : 'none',
                 outlineOffset: '4px',
+                zIndex: text.zIndex,
               }}
               onMouseDown={(e) => handleMouseDown(e, text.id, 'text', text.x, text.y)}
             >
@@ -239,17 +244,46 @@ export default function Canvas() {
           return (
             <div
               key={icon.id}
-              className="absolute z-20 cursor-move select-none"
+              className="absolute cursor-move select-none"
               style={{
                 left: '50%',
                 top: '50%',
                 transform: `translate(-50%, -50%) translate(${icon.x}px, ${icon.y}px)`,
                 outline: isSelected ? '2px dashed #3b82f6' : 'none',
                 outlineOffset: '4px',
+                zIndex: icon.zIndex,
               }}
               onMouseDown={(e) => handleMouseDown(e, icon.id, 'icon', icon.x, icon.y)}
             >
               {renderIconContent(icon)}
+            </div>
+          );
+        })}
+
+        {/* 渲染所有 AI 图片 */}
+        {aiImages.map((img) => {
+          const isSelected = selectedElementId === img.id && selectedElementType === 'aiImage';
+
+          return (
+            <div
+              key={img.id}
+              className="absolute cursor-move select-none"
+              style={{
+                left: '50%',
+                top: '50%',
+                transform: `translate(-50%, -50%) translate(${img.x}px, ${img.y}px) rotate(${img.rotation}deg) scale(${img.scale})`,
+                outline: isSelected ? '2px dashed #3b82f6' : 'none',
+                outlineOffset: '4px',
+                zIndex: img.zIndex,
+              }}
+              onMouseDown={(e) => handleMouseDown(e, img.id, 'aiImage', img.x, img.y)}
+            >
+              <img
+                src={img.imageUrl}
+                alt="AI 生成图片"
+                className="pointer-events-none max-w-[400px] max-h-[400px]"
+                draggable={false}
+              />
             </div>
           );
         })}
