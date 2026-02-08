@@ -54,10 +54,15 @@ components/
     Controls.tsx        # 左侧控制面板（所有配置选项）
     Canvas.tsx          # 右侧画布（实时预览和导出）
     IconPicker.tsx      # 图标选择器（Iconify 搜索）
+    AIPanel.tsx         # AI 助手面板（文生图/图生图）
   ui/                   # Shadcn/ui 组件
 
 store/
   useCoverStore.ts      # Zustand 状态管理
+  useAIStore.ts         # AI 助手状态管理
+
+lib/
+  ai-service.ts         # AI 图片生成服务（Gemini/OpenAI/OpenRouter）
 ```
 
 ### 关键功能实现
@@ -98,3 +103,32 @@ store/
 - 导出功能依赖 DOM 元素的 `id="cover-canvas"`
 - 修改状态使用 Zustand 的 `updateText/updateIcon/updateBackground` 方法
 - 添加新图标容器形状需同时修改 `useCoverStore.ts` 类型和 `Canvas.tsx` 渲染逻辑
+
+## AI 助手功能
+
+### 支持的 Provider
+
+- **Gemini**: 文生图/图生图，支持比例、分辨率、联网搜索
+- **OpenAI**: DALL-E 3 文生图，DALL-E 2 图生图
+- **OpenRouter**: 代理多种模型
+
+### 状态管理 (store/useAIStore.ts)
+
+- API 配置持久化到 localStorage（包含 API Key）
+- 生成图片限制最多 20 张，防止内存溢出
+- 支持多 Provider 独立配置
+
+### 安全措施
+
+- Gemini API Key 通过 `x-goog-api-key` header 传输，不暴露在 URL 中
+- OpenAI/OpenRouter 使用 Authorization header
+- 错误信息过滤，敏感信息仅输出到控制台
+- API Key 输入框使用 `type="password"`
+
+### 部署安全说明
+
+纯静态站点，API Key 仅存储在用户本地浏览器的 localStorage 中：
+- 服务器上无任何敏感数据
+- 用户之间完全隔离
+- 建议在 EdgeOne/CDN 配置 CSP 响应头防止 XSS 攻击
+

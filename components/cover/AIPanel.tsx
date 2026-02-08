@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { useAIStore } from '@/store/useAIStore';
 import { useCoverStore } from '@/store/useCoverStore';
-import { geminiGenerateImage, geminiEditImage, openaiGenerateImage, openaiEditImage } from '@/lib/ai-service';
+import { geminiGenerateImage, geminiEditImage, openaiGenerateImage, openaiEditImage, openrouterGenerateImage, openrouterEditImage } from '@/lib/ai-service';
 
 const ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
 const OPENAI_ASPECT_RATIOS = ['1:1', '16:9', '9:16'];
@@ -70,6 +70,10 @@ export default function AIPanel() {
         images = mode === 'generate'
           ? await openaiGenerateImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, prompt, options)
           : await openaiEditImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, sourceImage!, prompt, options);
+      } else if (config.provider === 'openrouter') {
+        images = mode === 'generate'
+          ? await openrouterGenerateImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, prompt, options)
+          : await openrouterEditImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, sourceImage!, prompt, options);
       } else {
         images = mode === 'generate'
           ? await geminiGenerateImage(currentProvider.endpoint, currentProvider.apiKey, currentProvider.model, prompt, options)
@@ -78,7 +82,8 @@ export default function AIPanel() {
 
       images.forEach(addGeneratedImage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '生成失败');
+      console.error('AI 生成错误:', err);
+      setError('生成失败，请检查 API Key 和网络连接');
     } finally {
       setGenerating(false);
     }
@@ -131,13 +136,14 @@ export default function AIPanel() {
           <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
             <Label className="text-xs font-medium">API 配置</Label>
             <div className="space-y-2">
-              <Select value={config.provider} onValueChange={(v: 'gemini' | 'openai') => updateConfig({ provider: v })}>
+              <Select value={config.provider} onValueChange={(v: 'gemini' | 'openai' | 'openrouter') => updateConfig({ provider: v })}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="gemini">Gemini</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="openrouter">OpenRouter</SelectItem>
                 </SelectContent>
               </Select>
               <Input

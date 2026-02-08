@@ -8,9 +8,10 @@ export interface ProviderConfig {
 }
 
 export interface AIConfig {
-  provider: 'gemini' | 'openai';
+  provider: 'gemini' | 'openai' | 'openrouter';
   gemini: ProviderConfig;
   openai: ProviderConfig;
+  openrouter: ProviderConfig;
   aspectRatio: string;
   imageSize: string;
   useGoogleSearch: boolean;
@@ -45,6 +46,11 @@ export const useAIStore = create<AIState>()(
           apiKey: '',
           model: 'dall-e-3',
         },
+        openrouter: {
+          endpoint: 'https://openrouter.ai/api/v1',
+          apiKey: '',
+          model: 'google/gemini-2.5-flash-image',
+        },
         aspectRatio: '1:1',
         imageSize: '1K',
         useGoogleSearch: false,
@@ -57,7 +63,12 @@ export const useAIStore = create<AIState>()(
         set((state) => ({ config: { ...state.config, ...newConfig } })),
       setGenerating: (isGenerating) => set({ isGenerating }),
       addGeneratedImage: (image) =>
-        set((state) => ({ generatedImages: [image, ...state.generatedImages] })),
+        set((state) => {
+          const newImages = [image, ...state.generatedImages];
+          // 限制最多保留 20 张图片，防止内存溢出
+          if (newImages.length > 20) newImages.pop();
+          return { generatedImages: newImages };
+        }),
       removeGeneratedImage: (index) =>
         set((state) => ({ generatedImages: state.generatedImages.filter((_, i) => i !== index) })),
       clearImages: () => set({ generatedImages: [] }),
@@ -65,34 +76,53 @@ export const useAIStore = create<AIState>()(
     }),
     {
       name: 'ai-config',
-      version: 1,
+      version: 2,
       partialize: (state) => ({ config: state.config }),
-      // 迁移旧配置结构
       migrate: (persisted, version) => {
-        if (version === 0) {
-          const old = persisted as { config?: { provider?: string; endpoint?: string; apiKey?: string; model?: string } };
-          if (old.config && !('gemini' in old.config)) {
-            // 旧结构迁移到新结构
-            return {
-              config: {
-                provider: old.config.provider || 'gemini',
-                gemini: {
-                  endpoint: old.config.provider === 'gemini' ? (old.config.endpoint || 'https://generativelanguage.googleapis.com/v1beta') : 'https://generativelanguage.googleapis.com/v1beta',
-                  apiKey: old.config.provider === 'gemini' ? (old.config.apiKey || '') : '',
-                  model: old.config.provider === 'gemini' ? (old.config.model || 'gemini-2.0-flash-exp-image-generation') : 'gemini-2.0-flash-exp-image-generation',
-                },
-                openai: {
-                  endpoint: old.config.provider === 'openai' ? (old.config.endpoint || 'https://api.openai.com/v1') : 'https://api.openai.com/v1',
-                  apiKey: old.config.provider === 'openai' ? (old.config.apiKey || '') : '',
-                  model: old.config.provider === 'openai' ? (old.config.model || 'dall-e-3') : 'dall-e-3',
-                },
-                aspectRatio: (old.config as Record<string, unknown>).aspectRatio as string || '1:1',
-                imageSize: (old.config as Record<string, unknown>).imageSize as string || '1K',
-                useGoogleSearch: (old.config as Record<string, unknown>).useGoogleSearch as boolean || false,
+        const state = persisted as { config?: Record<string, unknown> };
+        if (!state.config) return persisted;
+
+        // v0 -> v2: 旧结构迁移
+        if (version === 0 && !('gemini' in state.config)) {
+          return {
+            config: {
+              provider: state.config.provider || 'gemini',
+              gemini: {
+                endpoint: state.config.provider === 'gemini' ? (state.config.endpoint || 'https://generativelanguage.googleapis.com/v1beta') : 'https://generativelanguage.googleapis.com/v1beta',
+                apiKey: state.config.provider === 'gemini' ? (state.config.apiKey || '') : '',
+                model: state.config.provider === 'gemini' ? (state.config.model || 'gemini-2.0-flash-exp-image-generation') : 'gemini-2.0-flash-exp-image-generation',
               },
-            };
-          }
+              openai: {
+                endpoint: state.config.provider === 'openai' ? (state.config.endpoint || 'https://api.openai.com/v1') : 'https://api.openai.com/v1',
+                apiKey: state.config.provider === 'openai' ? (state.config.apiKey || '') : '',
+                model: state.config.provider === 'openai' ? (state.config.model || 'dall-e-3') : 'dall-e-3',
+              },
+              openrouter: {
+                endpoint: 'https://openrouter.ai/api/v1',
+                apiKey: '',
+                model: 'google/gemini-2.0-flash-exp:free',
+              },
+              aspectRatio: state.config.aspectRatio || '1:1',
+              imageSize: state.config.imageSize || '1K',
+              useGoogleSearch: state.config.useGoogleSearch || false,
+            },
+          };
         }
+
+        // v1 -> v2: 添加 openrouter
+        if (version === 1 && !('openrouter' in state.config)) {
+          return {
+            config: {
+              ...state.config,
+              openrouter: {
+                endpoint: 'https://openrouter.ai/api/v1',
+                apiKey: '',
+                model: 'google/gemini-2.0-flash-exp:free',
+              },
+            },
+          };
+        }
+
         return persisted;
       },
     }

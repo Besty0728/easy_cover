@@ -27,6 +27,19 @@ interface OpenAIResponse {
   };
 }
 
+interface OpenRouterResponse {
+  choices?: Array<{
+    message?: {
+      images?: Array<{
+        image_url?: { url: string };
+      }>;
+    };
+  }>;
+  error?: {
+    message: string;
+  };
+}
+
 export interface ImageGenerationOptions {
   aspectRatio?: string;
   imageSize?: string;
@@ -78,7 +91,7 @@ export async function openaiGenerateImage(
     .map((d) => `data:image/png;base64,${d.b64_json}`);
 }
 
-// OpenAI 图生图（使用 variations 端点，仅 DALL-E 2 支持）
+// OpenAI 图生图（仅 DALL-E 2 支持）
 export async function openaiEditImage(
   endpoint: string,
   apiKey: string,
@@ -87,7 +100,7 @@ export async function openaiEditImage(
   prompt: string,
   options?: ImageGenerationOptions
 ): Promise<string[]> {
-  // DALL-E 3 不支持图生图，使用文生图并在 prompt 中描述
+  // DALL-E 3 不支持图生图，使用文生图
   if (model.includes('dall-e-3')) {
     return openaiGenerateImage(endpoint, apiKey, model, prompt, options);
   }
@@ -96,7 +109,6 @@ export async function openaiEditImage(
   // 注意：edits 端点不需要 model 参数，且图片必须是正方形 PNG（最大 4MB）
   const url = `${endpoint}/images/edits`;
 
-  // 从 base64 创建 Blob
   const match = imageBase64.match(/^data:(.+);base64,(.+)$/);
   const base64Data = match?.[2] || imageBase64;
   const binaryData = atob(base64Data);
@@ -115,9 +127,7 @@ export async function openaiEditImage(
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}` },
     body: formData,
   });
 
@@ -131,7 +141,7 @@ export async function openaiEditImage(
     .map((d) => `data:image/png;base64,${d.b64_json}`);
 }
 
-// 文生图
+// Gemini 文生图
 export async function geminiGenerateImage(
   endpoint: string,
   apiKey: string,
@@ -139,15 +149,12 @@ export async function geminiGenerateImage(
   prompt: string,
   options?: ImageGenerationOptions
 ): Promise<string[]> {
-  const url = `${endpoint}/models/${model}:generateContent?key=${apiKey}`;
+  const url = `${endpoint}/models/${model}:generateContent`;
 
   const generationConfig: Record<string, unknown> = {
     responseModalities: ['TEXT', 'IMAGE'],
   };
 
-  // 添加 imageConfig
-  // aspectRatio: 非 1:1 时需要指定
-  // imageSize: 仅 gemini-3 系列支持，非 1K 时需要指定
   const needsAspectRatio = options?.aspectRatio && options.aspectRatio !== '1:1';
   const needsImageSize = options?.imageSize && options.imageSize !== '1K' && model.includes('gemini-3');
   if (needsAspectRatio || needsImageSize) {
@@ -162,14 +169,16 @@ export async function geminiGenerateImage(
     generationConfig,
   };
 
-  // 添加 Google Search 工具（仅当启用时）
   if (options?.useGoogleSearch) {
     body.tools = [{ googleSearch: {} }];
   }
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
     body: JSON.stringify(body),
   });
 
@@ -183,7 +192,7 @@ export async function geminiGenerateImage(
     .map((p) => `data:${p.inlineData!.mimeType};base64,${p.inlineData!.data}`);
 }
 
-// 图生图/修图
+// Gemini 图生图
 export async function geminiEditImage(
   endpoint: string,
   apiKey: string,
@@ -192,9 +201,8 @@ export async function geminiEditImage(
   prompt: string,
   options?: ImageGenerationOptions
 ): Promise<string[]> {
-  const url = `${endpoint}/models/${model}:generateContent?key=${apiKey}`;
+  const url = `${endpoint}/models/${model}:generateContent`;
 
-  // 从 data URL 提取 base64 和 mime type
   const match = imageBase64.match(/^data:(.+);base64,(.+)$/);
   const mimeType = match?.[1] || 'image/png';
   const base64Data = match?.[2] || imageBase64;
@@ -203,7 +211,6 @@ export async function geminiEditImage(
     responseModalities: ['TEXT', 'IMAGE'],
   };
 
-  // 添加 imageConfig
   const needsAspectRatio = options?.aspectRatio && options.aspectRatio !== '1:1';
   const needsImageSize = options?.imageSize && options.imageSize !== '1K' && model.includes('gemini-3');
   if (needsAspectRatio || needsImageSize) {
@@ -215,7 +222,10 @@ export async function geminiEditImage(
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
     body: JSON.stringify({
       contents: [{
         parts: [
@@ -235,4 +245,89 @@ export async function geminiEditImage(
   return data.candidates[0].content.parts
     .filter((p) => p.inlineData)
     .map((p) => `data:${p.inlineData!.mimeType};base64,${p.inlineData!.data}`);
+}
+
+// OpenRouter 文生图
+export async function openrouterGenerateImage(
+  endpoint: string,
+  apiKey: string,
+  model: string,
+  prompt: string,
+  options?: ImageGenerationOptions
+): Promise<string[]> {
+  const url = `${endpoint}/chat/completions`;
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    modalities: ['image', 'text'],
+  };
+
+  if (options?.aspectRatio && options.aspectRatio !== '1:1') {
+    body.image_config = { aspect_ratio: options.aspectRatio };
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data: OpenRouterResponse = await response.json();
+
+  if (data.error) throw new Error(data.error.message);
+  if (!data.choices?.[0]?.message?.images?.length) throw new Error('无效的响应格式');
+
+  return data.choices[0].message.images
+    .filter((img) => img.image_url?.url)
+    .map((img) => img.image_url!.url);
+}
+
+// OpenRouter 图生图
+export async function openrouterEditImage(
+  endpoint: string,
+  apiKey: string,
+  model: string,
+  imageBase64: string,
+  prompt: string,
+  options?: ImageGenerationOptions
+): Promise<string[]> {
+  const url = `${endpoint}/chat/completions`;
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: imageBase64 } },
+        { type: 'text', text: prompt },
+      ],
+    }],
+    modalities: ['image', 'text'],
+  };
+
+  if (options?.aspectRatio && options.aspectRatio !== '1:1') {
+    body.image_config = { aspect_ratio: options.aspectRatio };
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data: OpenRouterResponse = await response.json();
+
+  if (data.error) throw new Error(data.error.message);
+  if (!data.choices?.[0]?.message?.images?.length) throw new Error('无效的响应格式');
+
+  return data.choices[0].message.images
+    .filter((img) => img.image_url?.url)
+    .map((img) => img.image_url!.url);
 }
