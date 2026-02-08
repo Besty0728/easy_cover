@@ -39,7 +39,7 @@ export const useAIStore = create<AIState>()(
         gemini: {
           endpoint: 'https://generativelanguage.googleapis.com/v1beta',
           apiKey: '',
-          model: 'gemini-2.0-flash-exp-image-generation',
+          model: 'gemini-3-pro-image-preview',
         },
         openai: {
           endpoint: 'https://api.openai.com/v1',
@@ -90,7 +90,7 @@ export const useAIStore = create<AIState>()(
               gemini: {
                 endpoint: state.config.provider === 'gemini' ? (state.config.endpoint || 'https://generativelanguage.googleapis.com/v1beta') : 'https://generativelanguage.googleapis.com/v1beta',
                 apiKey: state.config.provider === 'gemini' ? (state.config.apiKey || '') : '',
-                model: state.config.provider === 'gemini' ? (state.config.model || 'gemini-2.0-flash-exp-image-generation') : 'gemini-2.0-flash-exp-image-generation',
+                model: state.config.provider === 'gemini' ? (state.config.model || 'gemini-3-pro-image-preview') : 'gemini-3-pro-image-preview',
               },
               openai: {
                 endpoint: state.config.provider === 'openai' ? (state.config.endpoint || 'https://api.openai.com/v1') : 'https://api.openai.com/v1',
