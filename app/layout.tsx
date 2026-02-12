@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EasyCover - AcoFork",
-  description: "EasyCover - AcoFork",
+  title: "EasyCover - MicoStar",
+  description: "EasyCover - MicoStar",
   icons: {
     icon: "/favicon.svg",
   },
